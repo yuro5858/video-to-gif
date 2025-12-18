@@ -1,95 +1,96 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>動画 → GIF 変換</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Video to GIF風</title>
 
 <style>
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    background: #f2f2f7;
-    padding: 20px;
-    text-align: center;
-  }
-  h1 {
-    font-size: 22px;
-    margin-bottom: 20px;
-  }
-  button {
-    background: #007aff;
-    color: white;
-    border: none;
-    padding: 12px 20px;
-    font-size: 16px;
-    border-radius: 10px;
-    margin-top: 10px;
-  }
-  button:disabled {
-    background: #aaa;
-  }
-  input {
-    margin: 10px 0;
-  }
-  #status {
-    margin-top: 15px;
-    font-size: 14px;
-  }
-  img {
-    margin-top: 20px;
-    max-width: 100%;
-    border-radius: 12px;
-  }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #f2f2f7;
+  text-align: center;
+  padding: 20px;
+}
+h1 {
+  font-size: 20px;
+}
+button {
+  background: #007aff;
+  color: white;
+  border: none;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-size: 16px;
+}
+input {
+  margin: 12px 0;
+}
+#status {
+  margin-top: 10px;
+  color: #555;
+}
+img {
+  margin-top: 20px;
+  max-width: 100%;
+  border-radius: 12px;
+}
 </style>
 </head>
 
 <body>
+<h1>動画をGIF風に変換</h1>
 
-<h1>動画をGIFに変換</h1>
-
-<input type="file" accept="video/*" id="videoInput">
-
-<br>
-
-<button onclick="convert()">GIFに変換</button>
-
+<input type="file" accept="video/*" id="videoInput" />
+<br />
+<button onclick="convert()">変換</button>
 <p id="status"></p>
 
-<img id="result">
+<img id="preview" />
 
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js"></script>
+<video id="video" style="display:none"></video>
+<canvas id="canvas" style="display:none"></canvas>
+
 <script>
-const { createFFmpeg, fetchFile } = FFmpeg;
-const ffmpeg = createFFmpeg({ log: true });
-
 async function convert() {
-  const file = document.getElementById('videoInput').files[0];
+  const file = document.getElementById("videoInput").files[0];
   if (!file) return;
 
-  const status = document.getElementById('status');
-  status.textContent = "変換中…（30秒ほどかかる場合あり）";
+  const status = document.getElementById("status");
+  status.textContent = "処理中…";
 
-  if (!ffmpeg.isLoaded()) {
-    await ffmpeg.load();
+  const video = document.getElementById("video");
+  video.src = URL.createObjectURL(file);
+  await video.play();
+  video.pause();
+
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+
+  const width = 200;
+  const scale = width / video.videoWidth;
+  canvas.width = width;
+  canvas.height = video.videoHeight * scale;
+
+  const frames = [];
+  const duration = Math.min(video.duration, 3); // 最大3秒
+  const fps = 5;
+
+  for (let t = 0; t < duration; t += 1 / fps) {
+    video.currentTime = t;
+    await new Promise(r => setTimeout(r, 120));
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    frames.push(canvas.toDataURL("image/webp"));
   }
 
-  ffmpeg.FS('writeFile', 'input.mp4', await fetchFile(file));
+  let i = 0;
+  const img = document.getElementById("preview");
+  setInterval(() => {
+    img.src = frames[i++ % frames.length];
+  }, 200);
 
-  await ffmpeg.run(
-    '-i', 'input.mp4',
-    '-vf', 'fps=10,scale=360:-1',
-    'out.gif'
-  );
-
-  const data = ffmpeg.FS('readFile', 'out.gif');
-  const gifURL = URL.createObjectURL(
-    new Blob([data.buffer], { type: 'image/gif' })
-  );
-
-  document.getElementById('result').src = gifURL;
-  status.textContent = "完成！GIFを長押しして保存できます";
+  status.textContent = "完了！（GIF風）";
 }
 </script>
-
 </body>
 </html>
